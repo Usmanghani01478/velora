@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Velora</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+*{margin:0;padding:0;box-sizing:border-box;font-family:Inter,sans-serif}
+body{background:#050505;color:#fff}
+.center{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+.card{width:360px;background:#141414;border:1px solid #2a2a2a;border-radius:24px;padding:32px}
+.logo{width:64px;height:64px;background:#222;border-radius:18px;display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:700;margin-bottom:20px}
+p{color:#9c9c9c;margin:12px 0 24px}
+button{width:100%;padding:14px;border:none;border-radius:14px;background:#fff;color:#000;font-weight:700;cursor:pointer;font-size:15px}
+.app{display:none}
+.sidebar{position:fixed;left:0;top:0;bottom:0;width:240px;background:#101010;border-right:1px solid #222;padding:24px;display:flex;flex-direction:column}
+.brand{font-size:24px;font-weight:700;margin-bottom:40px}
+.nav{padding:14px;background:#181818;border-radius:14px;margin-bottom:12px;cursor:pointer}
+.main{margin-left:260px;padding:30px}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:18px;margin-top:20px}
+.box{background:#161616;border:1px solid #2b2b2b;border-radius:20px;padding:22px}
+.green{color:#32d26e;font-weight:700;font-size:22px;margin-top:8px}
+.red{color:#ff5b5b;font-weight:700;font-size:22px;margin-top:8px}
+.user{margin-top:auto;padding-top:20px;border-top:1px solid #222}
+.user img{width:48px;height:48px;border-radius:50%;margin-bottom:10px}
+.logout{margin-top:16px;background:#222;color:#fff;border-radius:14px}
+#loadingMsg{color:#999;font-size:13px;margin-top:12px;text-align:center}
+</style>
+</head>
+<body>
+
+<div class="center" id="loginPage">
+  <div class="card">
+    <div class="logo">V</div>
+    <h1>Velora</h1>
+    <p>Sign in with Google to continue.</p>
+    <button onclick="googleLogin()">Continue with Google</button>
+    <div id="loadingMsg"></div>
+  </div>
+</div>
+
+<div class="app" id="appPage">
+  <div class="sidebar">
+    <div class="brand">Velora</div>
+    <div class="nav">Dashboard</div>
+    <div class="nav">Projects</div>
+    <div class="nav">Earnings</div>
+    <div class="nav">Notes</div>
+    <div class="nav">Expenses</div>
+    <div class="nav">Profile</div>
+    <div class="user" id="userBox"></div>
+    <button class="logout" onclick="logout()">Logout</button>
+  </div>
+  <div class="main">
+    <h1>Dashboard</h1>
+    <div class="grid">
+      <div class="box"><h3>Total Earnings</h3><div class="green">$12,480</div></div>
+      <div class="box"><h3>Monthly Growth</h3><div class="green">+24%</div></div>
+      <div class="box"><h3>Expenses</h3><div class="red">-$1,240</div></div>
+      <div class="box"><h3>Clients</h3><div style="font-size:22px;margin-top:8px">18 Active</div></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const SUPABASE_URL = "https://hrvznqghyvzauulchizg.supabase.co";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhydnpucWdoeXZ6YXV1bGNoaXpnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODAzMDE2NjEsImV4cCI6MjA5NTg3NzY2MX0.nwjvOCaGLL1zsDFM3Q0BztrrKTP5Hmo1sJ2z3_uKukI";
+
+const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: true,
+    storageKey: 'velora-auth-v2',
+    storage: window.localStorage
+  }
+});
+
+function showDashboard(user) {
+  document.getElementById("loginPage").style.display = "none";
+  document.getElementById("appPage").style.display = "block";
+  document.getElementById("userBox").innerHTML = `
+    <img src="${user.user_metadata?.avatar_url || ''}" onerror="this.src='https://ui-avatars.com/api/?name=${encodeURIComponent(user.email)}&background=222&color=fff'">
+    <div style="font-weight:600;margin-top:8px">${user.user_metadata?.full_name || 'User'}</div>
+    <div style="font-size:12px;color:#666;margin-top:4px">${user.email}</div>
+  `;
+}
+
+function showLogin() {
+  document.getElementById("loginPage").style.display = "flex";
+  document.getElementById("appPage").style.display = "none";
+}
+
+async function googleLogin() {
+  document.getElementById("loadingMsg").textContent = "Redirecting to Google...";
+  const { error } = await supabaseClient.auth.signInWithOAuth({
+    provider: "google",
+    options: {
+      redirectTo: "https://usmanvelora.netlify.app",
+      queryParams: { access_type: 'offline', prompt: 'consent' }
+    }
+  });
+  if (error) {
+    document.getElementById("loadingMsg").textContent = "Error: " + error.message;
+  }
+}
+
+async function logout() {
+  await supabaseClient.auth.signOut();
+  showLogin();
+}
+
+// MAIN: This runs on every page load including after OAuth redirect
+supabaseClient.auth.onAuthStateChange((event, session) => {
+  console.log("Auth event:", event, session?.user?.email);
+  if (session && session.user) {
+    showDashboard(session.user);
+  } else if (event === 'SIGNED_OUT') {
+    showLogin();
+  }
+});
+
+// Also check on load
+window.addEventListener("load", async () => {
+  const { data: { session } } = await supabaseClient.auth.getSession();
+  if (session && session.user) {
+    showDashboard(session.user);
+  } else {
+    showLogin();
+  }
+});
+</script>
+</body>
+</html>
